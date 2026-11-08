@@ -1,0 +1,11 @@
+# Security
+
+Main-process credentials use `@napi-rs/keyring`: macOS Keychain, Windows credential store, or Linux Secret Service. Linux explicitly requires Secret Service instead of a transient kernel-keyring fallback. A missing/locked store fails; there is no plaintext fallback. Keychain writes on macOS remain unverified in this Linux machine. Environment credentials are reused and take precedence. No key is returned over IPC or included in settings SQLite. Only user-entered credential values cross the dedicated write-only IPC endpoint.
+
+Local pages use context isolation, a sandboxed renderer, no Node integration, a restrictive CSP (`connect-src 'none'`), denied new windows and navigation, and exact main-frame IPC sender checks. Provider SDKs are bundled only into the main process. Every settings/audio/credential/confirmation/telemetry input is schema validated. API errors cross IPC as sanitized messages, not raw response bodies or request objects.
+
+Tools use a registry of explicit names, strict argument schemas, and independent authorization on every invocation. The only registered tool reads real system metrics; it still requires user approval, tied to a unique single-use 60-second confirmation. Unknown/malformed calls never execute. No shell, filesystem mutations, URL opening, or destructive action is registered. Levels 0–3 are represented for future policies; higher-risk capabilities must define their own policy before registration.
+
+Conversation content and optional audio cache stay in memory, and clear-history removes both. Settings SQLite is chmod 0600. No conversations are silently persisted. `.env` files are ignored, and Vite receives no credential variables. Runtime HTTP proxies retain inherited CA trust and TLS verification. Neither model text nor tool results may bypass authorization.
+
+The headless cloud test disables Chromium's OS sandbox only via its command-line flag. Normal `npm run dev` retains it. Before shipping a signed macOS application, configure `NSMicrophoneUsageDescription`, hardened runtime entitlements, signing/notarization, and test macOS privacy prompts/keychain access. Renderer isolation alone is not proof of target OS sandbox enforcement.

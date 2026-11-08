@@ -1,0 +1,11 @@
+# Voice pipeline
+
+Explicit push-to-talk asks the main process for macOS microphone authorization, then uses `getUserMedia` with audio-only constraints and selected input device. The Electron permission handler accepts audio capture only from the local main frame. Tracks are stopped on release, errors, timeout, or component teardown. Capture cancelled during a pending permission prompt also stops any stream granted later. Camera, mixed audio/video, unknown-media, and subframe permissions are denied.
+
+Capture uses mono PCM at 16 kHz, echo cancellation/noise suppression when supported, and a local RMS threshold for voice activity. Silence-only captures are rejected. This is energy VAD, not a learned speech/noise classifier; noisy environments may produce false positives. Capture stops at 120 seconds. ScriptProcessorNode is used for this initial desktop implementation; migration to AudioWorklet is planned.
+
+Release produces a WAV file, uploads it to the selected STT adapter, publishes final transcription, invokes streamed Groq chat, validates/authorizes tool calls, and synthesizes the final answer with Fish. English (`en`), Indonesian (`id`), and automatic language selection are passed to provider requests. Recognition quality is unverified without real requests. Partial STT is not exposed because these file transcription calls return final text.
+
+Fish HTTP audio bytes are forwarded over IPC. Playback uses MediaSource MP3 streaming where supported; otherwise it buffers a complete MP3 Blob. Web Audio measures real output RMS, and playback time/duration gives progress when duration is known. Progress can remain zero until streaming duration is available. Output-device selection uses AudioContext.setSinkId when supported; unsupported devices fail visibly. The custom UI receives a local playback callback and `audio-telemetry` IPC events.
+
+Stop speech aborts synthesis, clears playback buffers, and preserves the completed conversation. Cancel response also disposes microphone capture and aborts model/STT/tool work. Abort is cooperative: a completed external action cannot be rolled back. Starting push-to-talk interrupts the previous response; automatic acoustic barge-in and wake-word activation are not implemented. No ambient microphone audio is uploaded.
